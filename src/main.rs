@@ -17,8 +17,8 @@ fn main()-> tetra::Result {
 struct GameState {
     player1: Entity,
     player2: Entity,
-    court: Entity,
-    voley: Entity,
+    court: Staticobject,
+    voley: Staticobject,
     ball: Entity,
 }
 impl GameState{
@@ -28,6 +28,7 @@ impl GameState{
         let court_texture = Texture::new(ctx, "./resources/court.jpg")?;
         let voley_texture = Texture::new(ctx, "./resources/voley.png")?;
         let ball_texture = Texture:: new(ctx, "./resources/ball.png")?;
+        let player_width = player1_texture.width();
         let player1_position =
             Vec2::new(16.0, WINDOW_HEIGHT - player1_texture.height() as f32 -court_texture.height() as f32);
         let player2_position =
@@ -39,10 +40,10 @@ impl GameState{
         let ball_position =
             Vec2::new(WINDOW_WIDTH - 16.0 - player1_texture.width() as f32, ball_texture.height() as f32);
         Ok(GameState { 
-            player1: Entity::new(player1_texture, player1_position, 30f32, 300f32), 
-            player2: Entity::new(player2_texture, player2_position, 350f32, 600f32),
-            court: Entity::new(court_texture, court_position, 0f32, 640f32),
-            voley: Entity::new(voley_texture, voley_position, 0f32, 640f32),
+            player1: Entity::new(player1_texture, player1_position, 0.0, WINDOW_WIDTH/2.0 - player_width as f32 - voley_texture.width() as f32/2.0), 
+            player2: Entity::new(player2_texture, player2_position, WINDOW_WIDTH/2.0 + voley_texture.width() as f32/2.0, WINDOW_WIDTH - player_width as f32),
+            court: Staticobject::new(court_texture, court_position),
+            voley: Staticobject::new(voley_texture, voley_position),
             ball: Entity::new(ball_texture, ball_position, 0f32, 640f32)
          })
     }
@@ -93,6 +94,16 @@ struct Entity{
     col: Col,
     x_left_lim: f32,
     x_right_lim: f32
+}
+struct Staticobject{
+    texture: Texture,
+    position: Vec2<f32>,
+}
+
+impl Staticobject{
+    fn new(texture: Texture, position: Vec2<f32>) -> Staticobject {
+        Staticobject { texture, position }
+    }
 }
 impl Entity {
     fn new(texture: Texture, position: Vec2<f32>, x_left_lim:f32, x_right_lim:f32) -> Entity {
