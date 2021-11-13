@@ -39,11 +39,11 @@ impl GameState{
         let ball_position =
             Vec2::new(WINDOW_WIDTH - 16.0 - player1_texture.width() as f32, ball_texture.height() as f32);
         Ok(GameState { 
-            player1: Entity::new(player1_texture, player1_position), 
-            player2: Entity::new(player2_texture, player2_position),
-            court: Entity::new(court_texture, court_position),
-            voley: Entity::new(voley_texture, voley_position),
-            ball: Entity::new(ball_texture, ball_position)
+            player1: Entity::new(player1_texture, player1_position, 30f32, 300f32), 
+            player2: Entity::new(player2_texture, player2_position, 350f32, 600f32),
+            court: Entity::new(court_texture, court_position, 0f32, 640f32),
+            voley: Entity::new(voley_texture, voley_position, 0f32, 640f32),
+            ball: Entity::new(ball_texture, ball_position, 0f32, 640f32)
          })
     }
     
@@ -67,6 +67,8 @@ impl State for GameState{
         self.player2.updateVel();
         self.player1.updatePos();
         self.player2.updatePos();
+        self.ball.updateVel();
+        self.ball.updatePos();
         Ok(())
     }
     
@@ -82,27 +84,7 @@ impl Col{
         Col {t,b,r,l}
     } 
 }
-struct Bb{
-    x1: f32,
-    y1: f32,
-    x2: f32,
-    y2: f32
-}
-impl Bb{
-    fn new(x1:f32, y1:f32, x2: f32, y2: f32) -> Bb{
-        Bb {x1, y1, x2, y2}
-    }
-    fn checkCol(&mut self, other: Bb) -> Col{
-        let intersect_r: bool = self.x2 > other.x1 && self.x2 < other.x2;
-        let intersect_l: bool = self.x1 < other.x2 && self.x2 > other.x2;
-        let intersect_b: bool = self.y1 < other.y2 && self.y1 > other.y1;
-        let intersect_t: bool = self.y2 > other.y1 && self.y2 < other.y2;
-        let intersect_x: bool = intersect_l || intersect_r;
-        let intersect_y: bool = intersect_t || intersect_b;
-        let newCol = Col::new(intersect_t && intersect_x, intersect_b && intersect_y, intersect_l && intersect_y, intersect_r&&intersect_y);
-        return newCol;
-    }
-}
+
 struct Entity{
     texture: Texture,
     position: Vec2<f32>,
@@ -159,3 +141,36 @@ impl Entity {
         println!("{}", self.position.y);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+// struct Bb{
+//     x1: f32,
+//     y1: f32,
+//     x2: f32,
+//     y2: f32
+// }
+// impl Bb{
+//     fn new(x1:f32, y1:f32, x2: f32, y2: f32) -> Bb{
+//         Bb {x1, y1, x2, y2}
+//     }
+//     fn checkCol(&mut self, other: Bb) -> Col{
+//         let intersect_r: bool = self.x2 > other.x1 && self.x2 < other.x2;
+//         let intersect_l: bool = self.x1 < other.x2 && self.x2 > other.x2;
+//         let intersect_b: bool = self.y1 < other.y2 && self.y1 > other.y1;
+//         let intersect_t: bool = self.y2 > other.y1 && self.y2 < other.y2;
+//         let intersect_x: bool = intersect_l || intersect_r;
+//         let intersect_y: bool = intersect_t || intersect_b;
+//         let newCol = Col::new(intersect_t && intersect_x, intersect_b && intersect_y, intersect_l && intersect_y, intersect_r&&intersect_y);
+//         return newCol;
+//     }
+// }
