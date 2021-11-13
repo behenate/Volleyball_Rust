@@ -18,6 +18,7 @@ struct GameState {
     player2: Entity,
     court: Entity,
     voley: Entity,
+    ball: Entity,
 }
 impl GameState{
     fn new(ctx: &mut Context) -> tetra::Result<GameState> {
@@ -25,6 +26,7 @@ impl GameState{
         let player2_texture = Texture::new(ctx, "./resources/player2.png")?;
         let court_texture = Texture::new(ctx, "./resources/court.jpg")?;
         let voley_texture = Texture::new(ctx, "./resources/voley.png")?;
+        let ball_texture = Texture:: new(ctx, "./resources/ball.png")?;
         let player1_position =
             Vec2::new(16.0, WINDOW_HEIGHT - player1_texture.height() as f32 -court_texture.height() as f32);
         let player2_position =
@@ -32,12 +34,15 @@ impl GameState{
         let court_position =
             Vec2::new(0.0, WINDOW_HEIGHT - court_texture.height() as f32);
         let voley_position =
-            Vec2::new(320.0-voley_texture.width() as f32/2.0, WINDOW_HEIGHT - court_texture.height() as f32 - voley_texture.height() as f32);
+            Vec2::new(WINDOW_WIDTH/2.0 - voley_texture.width() as f32/2.0, WINDOW_HEIGHT - court_texture.height() as f32 - voley_texture.height() as f32);
+        let ball_position =
+            Vec2::new(WINDOW_WIDTH - 16.0 - player1_texture.width() as f32, ball_texture.height() as f32);
         Ok(GameState { 
             player1: Entity::new(player1_texture, player1_position), 
             player2: Entity::new(player2_texture, player2_position),
             court: Entity::new(court_texture, court_position),
             voley: Entity::new(voley_texture, voley_position),
+            ball: Entity::new(ball_texture, ball_position)
          })
     }
     
@@ -51,6 +56,7 @@ impl State for GameState{
         self.player2.texture.draw(ctx, self.player2.position);
         self.court.texture.draw(ctx, self.court.position);
         self.voley.texture.draw(ctx, self.voley.position);
+        self.ball.texture.draw(ctx, self.ball.position);
         Ok(())
     }
     fn update(&mut self, ctx: &mut Context) -> tetra::Result {
