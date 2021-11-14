@@ -1,6 +1,7 @@
 use tetra::{Context, ContextBuilder, State};
 use tetra::input::{self, Key};
 use tetra::graphics::{self,Color,Texture};
+use tetra::window;
 use tetra::math::Vec2;
 
 const WINDOW_WIDTH: f32 = 640.0;
@@ -21,8 +22,9 @@ fn main()-> tetra::Result {
 struct GameState {
     player1: Entity,
     player2: Entity,
-    court: Entity,
-    net: Entity,
+    court: Staticobject,
+    net: Staticobject,
+    score: Score,
     ball:Ball,
 }
 impl GameState{
@@ -32,6 +34,14 @@ impl GameState{
         let court_texture = Texture::new(ctx, "./resources/court.jpg")?;
         let net_texture = Texture::new(ctx, "./resources/net.png")?;
         let ball_texture = Texture:: new(ctx, "./resources/ball.png")?;
+        let score_texture0 = Texture::new(ctx, "./resources/0.png")?;
+        let score_texture1 = Texture::new(ctx, "./resources/1.png")?;
+        let score_texture2 = Texture::new(ctx, "./resources/2.png")?;
+        let score_texture3 = Texture::new(ctx, "./resources/3.png")?;
+        let score_texture4 = Texture::new(ctx, "./resources/4.png")?;
+        let score_texture5 = Texture::new(ctx, "./resources/5.png")?;
+        let scoreline_texture = Texture::new(ctx, "./resources/scoreline.png")?;
+        let scorenumbers_textures: [Texture;7] = [score_texture0,score_texture1,score_texture2,score_texture3,score_texture4,score_texture5,scoreline_texture];
         let player1_position =
             Vec2::new(16.0, WINDOW_HEIGHT - player1_texture.height() as f32 -court_texture.height() as f32);
         let player2_position =
@@ -41,15 +51,18 @@ impl GameState{
         let net_position =
             Vec2::new(WINDOW_WIDTH/2.0 + net_texture.width() as f32/2.0 , WINDOW_HEIGHT - court_texture.height() as f32 - net_texture.height() as f32);
         let ball_position =
-            Vec2::new(100f32 - player1_texture.width()as f32 /2 as f32, ball_texture.height() as f32);
+            Vec2::new(WINDOW_WIDTH - 100.0, ball_texture.height() as f32);
+        let score_position =
+            Vec2::new(WINDOW_WIDTH /2.0, 15.0);
         let mut ball: Ball = Ball::new(ball_texture, ball_position, 0f32, 620f32);
         let mut ball_ref: &Ball = &ball;
         Ok(GameState { 
             player1: Entity::new(player1_texture, player1_position, 30f32, 300f32), 
             player2: Entity::new(player2_texture, player2_position, 350f32, 600f32),
-            court: Entity::new(court_texture, court_position, 0f32, 640f32),
-            net: Entity::new(net_texture, net_position, 0f32, 640f32),
-            ball: ball
+            court: Staticobject::new(court_texture, court_position),
+            net: Staticobject::new(net_texture, net_position),
+            ball: ball,
+            score: Score::new(scorenumbers_textures,score_position,0,0)
          })
     }
     
@@ -62,6 +75,9 @@ impl State for GameState{
         self.court.texture.draw(ctx, self.court.position);
         self.net.texture.draw(ctx, self.net.position);
         self.ball.texture.draw(ctx, self.ball.position);
+        self.score.scornumbers[6].draw(ctx, self.score.position);
+        self.score.scornumbers[self.score.player1_score as usize].draw(ctx, Vec2::new(WINDOW_WIDTH /2.0 -10.0, 15.0));
+        self.score.scornumbers[self.score.player2_score as usize].draw(ctx, Vec2::new(WINDOW_WIDTH /2.0 +10.0, 15.0));
         Ok(())
     }
     fn update(&mut self, ctx: &mut Context) -> tetra::Result {
@@ -76,8 +92,20 @@ impl State for GameState{
         self.player1.checkBallCol(&mut self.ball);
         self.player2.checkBallCol(&mut self.ball);
         self.ball.checkNetCol(&mut self.net);
+        self.score.calculateScore(&mut self.ball,&mut self.court);
+        println!("{}",self.ball.position.y,);
+        println!("{}",WINDOW_HEIGHT-self.court.texture.height()as f32);
+        if self.score.player1_score == 5 {
+            window::quit(ctx);
+            println!("Player 1 wins!");
+        }
+        if self.score.player2_score == 5 {
+            window::quit(ctx);
+            println!("Player 2 wins!");
+        }
         Ok(())
     }
+    
     
 }
 struct Col{
@@ -90,6 +118,46 @@ impl Col{
     fn new(t:bool, b:bool, l:bool, r:bool) -> Col{
         Col {t,b,r,l}
     } 
+}
+struct Score{
+    scornumbers: [Texture;7],
+    position: Vec2<f32>, 
+    player1_score: i32,
+    player2_score: i32,
+}
+
+impl Score{
+    fn new(scornumbers: [Texture;7], position: Vec2<f32>, player1_score: i32, player2_score: i32) -> Score {
+        Score { scornumbers, position, player1_score, player2_score }
+    }
+    //WINDOW_WIDTH - 100.0, ball_texture.height() as f32
+    fn calculateScore(&mut self, ball: &mut Ball,court: &mut Staticobject){
+        if (ball.position.y > WINDOW_HEIGHT-court.texture.height()as f32- ball.texture.height() as f32*2.0) &&(ball.position.x > WINDOW_WIDTH/2.0){
+            ball.position.x= WINDOW_WIDTH - 100.0;
+            ball.position.y= ball.texture.height() as f32;
+            ball.velocity.x =0.0;
+            ball.velocity.y =0.0;
+            self.player1_score = self.player1_score+1;
+
+        }
+        if (ball.position.y > WINDOW_HEIGHT-court.texture.height()as f32- ball.texture.height() as f32*2.0) &&(ball.position.x < WINDOW_WIDTH/2.0){
+            ball.position.x= 100.0;
+            ball.position.y= ball.texture.height() as f32;
+            ball.velocity.x =0.0;
+            ball.velocity.y =0.0;
+            self.player2_score = self.player2_score+1;
+        }
+    }
+}
+struct Staticobject{
+    texture: Texture,
+    position: Vec2<f32>,
+}
+
+impl Staticobject{
+    fn new(texture: Texture, position: Vec2<f32>) -> Staticobject {
+        Staticobject { texture, position }
+    }
 }
 
 struct Entity{
@@ -212,7 +280,7 @@ impl Ball {
             self.velocity.x = -self.velocity.x;
         };
     }
-    fn checkNetCol(&mut self, net: &mut Entity){
+    fn checkNetCol(&mut self, net: &mut Staticobject){
         let tw:f32 = self.texture.width() as f32 / 2.0;
         let net_tw:f32 = net.texture.width() as f32;
         if (self.position.x+tw > net.position.x) &&(self.position.x-tw < net.position.x)&& self.position.y > FLOOR_LEVEL-net.texture.height() as f32{
