@@ -6,8 +6,12 @@ use tetra::math::Vec2;
 const WINDOW_WIDTH: f32 = 640.0;
 const WINDOW_HEIGHT: f32 = 480.0;
 const PLAYER_SPEED: f32 = 1.5f32;
+const JUMP_STRENGTH: f32 = 6f32;
 const FLOOR_LEVEL: f32 = 350f32;
-const GRAVITY: f32 = 0.98;
+const GRAVITY: f32 = 0.198;
+const BALL_GRAVITY:f32 = 0.098;
+const PLAYER_MASS: f32 = 100f32;
+const BALL_MASS:f32 = 50f32;
 fn main()-> tetra::Result {
     ContextBuilder::new("Volleyball", WINDOW_WIDTH as i32, WINDOW_HEIGHT as i32)
         .quit_on_escape(true)
@@ -18,15 +22,15 @@ struct GameState {
     player1: Entity,
     player2: Entity,
     court: Entity,
-    voley: Entity,
-    ball: Entity,
+    net: Entity,
+    ball:Ball,
 }
 impl GameState{
     fn new(ctx: &mut Context) -> tetra::Result<GameState> {
         let player1_texture = Texture::new(ctx, "./resources/player1.png")?;
         let player2_texture = Texture::new(ctx, "./resources/player2.png")?;
         let court_texture = Texture::new(ctx, "./resources/court.jpg")?;
-        let voley_texture = Texture::new(ctx, "./resources/voley.png")?;
+        let net_texture = Texture::new(ctx, "./resources/net.png")?;
         let ball_texture = Texture:: new(ctx, "./resources/ball.png")?;
         let player1_position =
             Vec2::new(16.0, WINDOW_HEIGHT - player1_texture.height() as f32 -court_texture.height() as f32);
@@ -34,16 +38,18 @@ impl GameState{
             Vec2::new(WINDOW_WIDTH - 16.0 - player1_texture.width() as f32, WINDOW_HEIGHT - player2_texture.height() as f32 -court_texture.height() as f32);
         let court_position =
             Vec2::new(0.0, WINDOW_HEIGHT - court_texture.height() as f32);
-        let voley_position =
-            Vec2::new(WINDOW_WIDTH/2.0 - voley_texture.width() as f32/2.0, WINDOW_HEIGHT - court_texture.height() as f32 - voley_texture.height() as f32);
+        let net_position =
+            Vec2::new(WINDOW_WIDTH/2.0 + net_texture.width() as f32/2.0 , WINDOW_HEIGHT - court_texture.height() as f32 - net_texture.height() as f32);
         let ball_position =
-            Vec2::new(WINDOW_WIDTH - 16.0 - player1_texture.width() as f32, ball_texture.height() as f32);
+            Vec2::new(100f32 - player1_texture.width()as f32 /2 as f32, ball_texture.height() as f32);
+        let mut ball: Ball = Ball::new(ball_texture, ball_position, 0f32, 620f32);
+        let mut ball_ref: &Ball = &ball;
         Ok(GameState { 
             player1: Entity::new(player1_texture, player1_position, 30f32, 300f32), 
             player2: Entity::new(player2_texture, player2_position, 350f32, 600f32),
             court: Entity::new(court_texture, court_position, 0f32, 640f32),
-            voley: Entity::new(voley_texture, voley_position, 0f32, 640f32),
-            ball: Entity::new(ball_texture, ball_position, 0f32, 640f32)
+            net: Entity::new(net_texture, net_position, 0f32, 640f32),
+            ball: ball
          })
     }
     
@@ -51,12 +57,10 @@ impl GameState{
 impl State for GameState{
     fn draw(&mut self, ctx: &mut Context) -> tetra::Result {
         graphics::clear(ctx, Color::rgb(0.392, 0.584, 0.929));
-
-    
         self.player1.texture.draw(ctx, self.player1.position);
         self.player2.texture.draw(ctx, self.player2.position);
         self.court.texture.draw(ctx, self.court.position);
-        self.voley.texture.draw(ctx, self.voley.position);
+        self.net.texture.draw(ctx, self.net.position);
         self.ball.texture.draw(ctx, self.ball.position);
         Ok(())
     }
@@ -69,6 +73,9 @@ impl State for GameState{
         self.player2.updatePos();
         self.ball.updateVel();
         self.ball.updatePos();
+        self.player1.checkBallCol(&mut self.ball);
+        self.player2.checkBallCol(&mut self.ball);
+        self.ball.checkNetCol(&mut self.net);
         Ok(())
     }
     
@@ -92,7 +99,7 @@ struct Entity{
     acceleration: Vec2<f32>,
     col: Col,
     x_left_lim: f32,
-    x_right_lim: f32
+    x_right_lim: f32,
 }
 impl Entity {
     fn new(texture: Texture, position: Vec2<f32>, x_left_lim:f32, x_right_lim:f32) -> Entity {
@@ -109,12 +116,11 @@ impl Entity {
         }else{
             self.acceleration.x = 0f32;
         }
-        if input::is_key_down(ctx, jump){
-            self.velocity.y = -5f32;
+        if input::is_key_down(ctx, jump) && self.col.b{
+            self.velocity.y = -JUMP_STRENGTH;
         }
     }
     fn updateVel(&mut self){
-        
         self.velocity.x = self.velocity.x - (self.velocity.x)*0.2;
         if (self.col.l && self.velocity.x < 0f32 || self.col.r && self.velocity.x > 0f32){
             self.velocity.x = 0f32;
@@ -123,8 +129,12 @@ impl Entity {
         }
         if (self.col.b) && self.velocity.y > 0f32{
             self.velocity.y = 0f32;
+            self.position.y = FLOOR_LEVEL+1f32;
         }else{
             self.velocity.y += self.acceleration.y;
+            if self.velocity.y > 0f32 {
+                self.velocity.y += self.acceleration.y;
+            }
         }
         
     }
@@ -138,10 +148,87 @@ impl Entity {
         self.col.r =self.position.x > self.x_right_lim;
         self.col.l = self.position.x < self.x_left_lim;
         self.col.b = self.position.y > FLOOR_LEVEL;
-        println!("{}", self.position.y);
+    }
+    fn checkBallCol(&mut self, ball: &mut Ball){
+        let self_cx:f32 = self.position.x + self.texture.width()as f32/2 as f32;
+        let mut self_cy:f32 = self.position.y + self.texture.height()as f32/2 as f32;
+        let mut ball_cx:f32 = ball.position.x + ball.texture.width()as f32/2 as f32;
+        let mut ball_cy:f32 = ball.position.y + ball.texture.height()as f32/2 as f32;
+        let mut dist:f32 =  ((self_cx-ball_cx).powf(2f32) + (self_cy - ball_cy).powf(2f32)).sqrt();
+        if dist < (ball.texture.width()/2 + self.texture.width()/2) as f32{
+            // let u1x: f32 = (PLAYER_MASS-BALL_MASS)/(PLAYER_MASS+BALL_MASS) * self.velocity.x + (2f32*BALL_MASS)/(PLAYER_MASS+BALL_MASS)*ball.velocity.x;
+            // let u1y: f32 = (PLAYER_MASS-BALL_MASS)/(PLAYER_MASS+BALL_MASS) * self.velocity.y + (2f32*BALL_MASS)/(PLAYER_MASS+BALL_MASS)*ball.velocity.y;
+            // let u2x: f32 = (2f32*PLAYER_MASS)/(PLAYER_MASS+BALL_MASS)*self.velocity.x + (BALL_MASS - PLAYER_MASS)/(PLAYER_MASS+BALL_MASS) * ball.velocity.x;
+            // let u2y: f32 = (2f32*PLAYER_MASS)/(PLAYER_MASS+BALL_MASS)*self.velocity.y + (BALL_MASS - PLAYER_MASS)/(PLAYER_MASS+BALL_MASS) * ball.velocity.y;
+            ball.velocity.x += self.velocity.x;
+            ball.velocity.y = -ball.velocity.y/2f32 + self.velocity.y/2f32;
+            while dist < (ball.texture.width()/2 + self.texture.width()/2) as f32 + 3f32{
+                let self_cx = self.position.x + self.texture.width()as f32/2 as f32;
+                let self_cy:f32 = self.position.y + self.texture.height()as f32/2 as f32;
+                let ball_cx:f32 = ball.position.x + ball.texture.width()as f32/2 as f32;
+                let ball_cy:f32 = ball.position.y + ball.texture.height()as f32/2 as f32;
+                dist =  ((self_cx-ball_cx).powf(2f32) + (self_cy - ball_cy).powf(2f32)).sqrt();
+                ball.position.x += ball.velocity.x;
+                ball.position.y += ball.velocity.y;
+            }
+            // self.position.x = 0f32;
+        }
     }
 }
+struct Ball{
+    texture: Texture,
+    position: Vec2<f32>,
+    velocity: Vec2<f32>,
+    acceleration: Vec2<f32>,
+    x_left_lim: f32,
+    x_right_lim: f32,
+}
 
+impl Ball {
+    fn new(texture: Texture, position: Vec2<f32>, x_left_lim:f32, x_right_lim:f32) -> Ball {
+        let velocity = Vec2::new(0f32,0f32);
+        let acceleration = Vec2::new(0f32, BALL_GRAVITY);
+        Ball { texture, position, velocity, acceleration, x_left_lim, x_right_lim}
+    }
+    fn updateVel(&mut self){
+        self.velocity.x = self.velocity.x * 0.999;
+        self.velocity.x += self.acceleration.x;
+        self.velocity.y += self.acceleration.y;
+        
+    }
+    fn updatePos(&mut self){
+        self.position.x += self.velocity.x;  
+        self.position.y += self.velocity.y;
+        if self.position.y > FLOOR_LEVEL{
+            self.position.y = FLOOR_LEVEL;
+            self.velocity.y = -self.velocity.y;
+        };
+        if self.position.x < self.x_left_lim{
+            self.position.x = self.x_left_lim;
+            self.velocity.x = -self.velocity.x;
+        };
+        if self.position.x > self.x_right_lim{
+            self.position.x = self.x_right_lim;
+            self.velocity.x = -self.velocity.x;
+        };
+    }
+    fn checkNetCol(&mut self, net: &mut Entity){
+        let tw:f32 = self.texture.width() as f32 / 2.0;
+        let net_tw:f32 = net.texture.width() as f32;
+        if (self.position.x+tw > net.position.x) &&(self.position.x-tw < net.position.x)&& self.position.y > FLOOR_LEVEL-net.texture.height() as f32{
+            self.velocity.x = -self.velocity.x/2f32;
+            while self.position.x+tw > net.position.x {
+                self.updatePos();
+            }
+        }
+        if (self.position.x-tw < net.position.x+net_tw) &&(self.position.x+tw > net.position.x + net_tw)&& self.position.y > FLOOR_LEVEL-net.texture.height() as f32{
+            self.velocity.x = -self.velocity.x/2f32;
+            while (self.position.x < net.position.x+net_tw) &&(self.position.x+tw > net.position.x + net_tw)&& self.position.y > FLOOR_LEVEL-net.texture.height() as f32 {
+                self.updatePos();
+            }
+        } 
+    }
+}
 
 
 
